@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Apoyo Técnico Escolar - Colegio Cafam</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+
+        // Configuración de Firebase (Se debe completar para persistencia real)
+        const firebaseConfig = {
+            apiKey: "", 
+            authDomain: "",
+            projectId: "",
+            storageBucket: "",
+            messagingSenderId: "",
+            appId: ""
+        };
+
+        // Inicializar Firebase solo si la config está presente, sino usar memoria local
+        let db;
+        try {
+            if (firebaseConfig.projectId) {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+            }
+        } catch (e) { console.error("Firebase no configurado"); }
+
+        window.db = db;
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        .priority-high { border-left: 8px solid #ef4444; }
+        .priority-medium { border-left: 8px solid #f59e0b; }
+        .priority-low { border-left: 8px solid #10b981; }
+
+        .card-anim {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .card-anim:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        #loginModal {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-12">
+
+    <!-- Header -->
+    <header class="bg-blue-700 text-white py-6 shadow-lg mb-8">
+        <div class="container mx-auto px-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold">Soporte Técnico Escolar</h1>
+                <p class="text-blue-100 text-sm">Panel de Solicitudes y Gestión</p>
+                <p class="text-blue-200 text-xs font-semibold mt-1 uppercase tracking-wider">Coordinación de Tecnología Colegio Cafam</p>
+            </div>
+            <nav class="space-x-4">
+                <button onclick="switchTab('request')" class="hover:underline font-semibold bg-blue-800 px-3 py-1 rounded">Nueva Solicitud</button>
+                <button id="adminNavBtn" onclick="handleAdminTabAccess()" class="hover:underline font-semibold">Panel Admin</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4">
+        
+        <!-- Sección de Formulario (Vista Docente) -->
+        <section id="tab-request" class="max-w-2xl mx-auto bg-white rounded-xl shadow-md overflow-hidden">
+            <div class="p-8">
+                <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                    <svg class="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                    Ingresar Nueva Solicitud
+                </h2>
+                
+                <form id="supportForm" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Nombre del Docente</label>
+                            <input type="text" id="teacherName" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Área Académica</label>
+                            <select id="academicArea" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border">
+                                <option value="" disabled selected>Seleccione área...</option>
+                                <option value="Matemáticas">Matemáticas</option>
+                                <option value="Inglés">Inglés</option>
+                                <option value="Ciencias Naturales">Ciencias Naturales</option>
+                                <option value="Sociales">Sociales</option>
+                                <option value="Artes">Artes</option>
+                                <option value="Tecnología">Tecnología</option>
+                                <option value="Castellano">Castellano</option>
+                                <option value="Humanidades">Humanidades</option>
+                                <option value="Educación Física">Educación Física</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Aula / Ubicación</label>
+                            <input type="text" id="location" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Tipo de Requerimiento</label>
+                            <select id="requestType" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border">
+                                <option value="Revisión de equipo">Revisión de equipo</option>
+                                <option value="Cambio de Monitor">Cambio de Monitor</option>
+                                <option value="Cambio de Mouse/Teclado">Cambio de Mouse/Teclado</option>
+                                <option value="Apoyo con Proyector">Apoyo con Proyector</option>
+                                <option value="Problemas de Red">Problemas de Red</option>
+                                <option value="Otro">Otro</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Nivel de Urgencia</label>
+                        <select id="priority" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border font-bold text-gray-800">
+                            <option value="Baja" class="text-green-600">Baja (Mantenimiento general)</option>
+                            <option value="Media" class="text-yellow-600">Media (Interfiere parcialmente)</option>
+                            <option value="Alta" class="text-red-600">Alta (No se puede dictar clase)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Descripción detallada</label>
+                        <textarea id="description" rows="3" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border focus:ring-blue-500" placeholder="Especifique el inconveniente..."></textarea>
+                    </div>
+
+                    <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-md font-bold hover:bg-blue-700 transition duration-300 shadow-md">
+                        Enviar Solicitud
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Sección de Administración -->
+        <section id="tab-admin" class="hidden space-y-6">
+            <div class="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800">Panel de Control Técnico</h2>
+                    <p class="text-sm text-gray-500">Sesión activa: <span id="currentUserDisplay" class="font-semibold text-blue-600"></span></p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button onclick="logout()" class="text-xs bg-gray-200 hover:bg-red-100 hover:text-red-600 px-3 py-1 rounded transition">Cerrar Sesión</button>
+                    <div class="flex gap-2">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">Alta</span>
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Media</span>
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Baja</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="ticketsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            <div id="emptyState" class="hidden text-center py-20">
+                <p class="text-gray-500 text-lg">No hay solicitudes pendientes en este momento.</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal de Login -->
+    <div id="loginModal" class="fixed inset-0 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8">
+            <div class="text-center mb-6">
+                <h3 class="text-2xl font-bold text-gray-800">Acceso Técnico</h3>
+                <p class="text-gray-500 text-sm">Ingrese sus credenciales de administración</p>
+            </div>
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Usuario</label>
+                    <input type="text" id="adminUser" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-3 bg-gray-50 border focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Contraseña</label>
+                    <input type="password" id="adminPass" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-3 bg-gray-50 border focus:ring-blue-500">
+                </div>
+                <div id="loginError" class="hidden text-red-600 text-sm font-medium">Credenciales incorrectas. Intente de nuevo.</div>
+                <div class="flex gap-3">
+                    <button type="button" onclick="closeLoginModal()" class="flex-1 bg-gray-200 text-gray-800 py-3 rounded-md font-bold hover:bg-gray-300 transition">Cancelar</button>
+                    <button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-md font-bold hover:bg-blue-700 transition">Entrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="notification" class="fixed bottom-5 right-5 transform translate-y-20 opacity-0 transition-all duration-300 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-2xl z-50">
+        ¡Acción realizada con éxito!
+    </div>
+
+    <script>
+        // --- CONFIGURACIÓN DE INTEGRACIONES ---
+        // PASO 1: Crea un Zap en Zapier (Webhook -> MS To Do)
+        // PASO 2: Pega aquí la URL que te dará Zapier:
+        const ZAPIER_WEBHOOK_URL = "https://hooks.zapier.com/hooks/catch/26281972/uls4xfx/"; 
+
+        let tickets = [];
+        let isAuthenticated = false;
+        let inactivityTimeout;
+        const INACTIVITY_LIMIT = 15 * 60 * 1000;
+
+        const ADMIN_CREDENTIALS = {
+            user: "carlcastro",
+            pass: "07iseRWyYFJ*.*"
+        };
+
+        const form = document.getElementById('supportForm');
+        const ticketsContainer = document.getElementById('ticketsContainer');
+        const emptyState = document.getElementById('emptyState');
+        const notification = document.getElementById('notification');
+        const loginModal = document.getElementById('loginModal');
+        const loginForm = document.getElementById('loginForm');
+        const loginError = document.getElementById('loginError');
+
+        // --- ENVIAR A ZAPIER (NOTIFICACIÓN TO DO) ---
+        async function sendToZapier(ticketData) {
+            if (!ZAPIER_WEBHOOK_URL) return; // Si no hay URL, no hace nada
+            
+            try {
+                await fetch(ZAPIER_WEBHOOK_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', // Necesario para evitar bloqueos de seguridad simples
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(ticketData)
+                });
+            } catch (error) {
+                console.log("Error enviando a Zapier:", error);
+            }
+        }
+
+        // --- SEGURIDAD ---
+        function handleAdminTabAccess() {
+            if (isAuthenticated) switchTab('admin');
+            else openLoginModal();
+        }
+
+        function openLoginModal() {
+            loginModal.classList.remove('hidden');
+            document.getElementById('adminUser').focus();
+        }
+
+        function closeLoginModal() {
+            loginModal.classList.add('hidden');
+            loginForm.reset();
+            loginError.classList.add('hidden');
+        }
+
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (document.getElementById('adminUser').value === ADMIN_CREDENTIALS.user && 
+                document.getElementById('adminPass').value === ADMIN_CREDENTIALS.pass) {
+                isAuthenticated = true;
+                document.getElementById('currentUserDisplay').textContent = ADMIN_CREDENTIALS.user;
+                closeLoginModal();
+                switchTab('admin');
+                startInactivityTimer();
+                showNotification('Bienvenido, Carlos Castro');
+            } else {
+                loginError.classList.remove('hidden');
+            }
+        });
+
+        function logout() {
+            isAuthenticated = false;
+            stopInactivityTimer();
+            switchTab('request');
+            showNotification('Sesión cerrada por seguridad');
+        }
+
+        function startInactivityTimer() {
+            resetInactivityTimer();
+            window.addEventListener('mousemove', resetInactivityTimer);
+            window.addEventListener('keypress', resetInactivityTimer);
+        }
+
+        function stopInactivityTimer() {
+            clearTimeout(inactivityTimeout);
+            window.removeEventListener('mousemove', resetInactivityTimer);
+            window.removeEventListener('keypress', resetInactivityTimer);
+        }
+
+        function resetInactivityTimer() {
+            if (!isAuthenticated) return;
+            clearTimeout(inactivityTimeout);
+            inactivityTimeout = setTimeout(() => { if (isAuthenticated) logout(); }, INACTIVITY_LIMIT);
+        }
+
+        // --- TICKETS ---
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const newTicket = {
+                id: Date.now(),
+                teacher: document.getElementById('teacherName').value,
+                area: document.getElementById('academicArea').value,
+                location: document.getElementById('location').value,
+                type: document.getElementById('requestType').value,
+                priority: document.getElementById('priority').value,
+                description: document.getElementById('description').value,
+                date: new Date().toLocaleString(),
+                status: 'Pendiente'
+            };
+
+            // Guardar localmente
+            tickets.push(newTicket);
+            
+            // Enviar notificación a To Do (Zapier)
+            sendToZapier(newTicket);
+
+            form.reset();
+            showNotification('Solicitud enviada y recordatorio generado');
+            renderTickets();
+        });
+
+        function renderTickets() {
+            ticketsContainer.innerHTML = '';
+            const priorityOrder = { 'Alta': 1, 'Media': 2, 'Baja': 3 };
+            const sortedTickets = [...tickets].sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+
+            if (sortedTickets.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                sortedTickets.forEach(ticket => {
+                    const card = document.createElement('div');
+                    card.className = `bg-white p-6 rounded-lg shadow-sm card-anim priority-${ticket.priority.toLowerCase()} border border-gray-100`;
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <span class="text-[10px] font-bold uppercase tracking-widest ${getBadgeColor(ticket.priority)} px-2 py-1 rounded">Prioridad ${ticket.priority}</span>
+                                <h3 class="text-lg font-bold text-gray-800 mt-2">${ticket.type}</h3>
+                            </div>
+                            <button onclick="removeTicket(${ticket.id})" class="text-green-500 hover:bg-green-50 p-1 rounded-full transition">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            </button>
+                        </div>
+                        <div class="text-sm text-gray-600 space-y-1 mb-4">
+                            <p><span class="font-bold text-gray-800">Docente:</span> ${ticket.teacher}</p>
+                            <p><span class="font-bold text-gray-800">Área:</span> ${ticket.area}</p>
+                            <p><span class="font-bold text-gray-800">Aula:</span> ${ticket.location}</p>
+                        </div>
+                        <div class="bg-blue-50 p-3 rounded text-sm text-blue-900 border border-blue-100 italic">"${ticket.description}"</div>
+                    `;
+                    ticketsContainer.appendChild(card);
+                });
+            }
+        }
+
+        function getBadgeColor(prio) {
+            if (prio === 'Alta') return 'bg-red-100 text-red-700';
+            if (prio === 'Media') return 'bg-yellow-100 text-yellow-700';
+            return 'bg-green-100 text-green-700';
+        }
+
+        function removeTicket(id) {
+            if (!isAuthenticated) return;
+            tickets = tickets.filter(t => t.id !== id);
+            showNotification('Ticket solucionado');
+            renderTickets();
+        }
+
+        function switchTab(tab) {
+            const reqTab = document.getElementById('tab-request');
+            const adminTab = document.getElementById('tab-admin');
+            const navBtn = document.getElementById('adminNavBtn');
+            if (tab === 'request') {
+                reqTab.classList.remove('hidden');
+                adminTab.classList.add('hidden');
+                navBtn.classList.remove('bg-blue-800', 'px-3', 'py-1', 'rounded');
+            } else {
+                reqTab.classList.add('hidden');
+                adminTab.classList.remove('hidden');
+                navBtn.classList.add('bg-blue-800', 'px-3', 'py-1', 'rounded');
+                renderTickets();
+            }
+        }
+
+        function showNotification(msg) {
+            notification.textContent = msg;
+            notification.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => notification.classList.add('translate-y-20', 'opacity-0'), 3000);
+        }
+    </script>
+</body>
+</html>
